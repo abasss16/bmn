@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Manajemen Aset ORMAWA - Galaxy</title>
+    <title>Sistem Manajemen Aset BMN</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -18,7 +18,10 @@
             --accent-pink: #ff0055;
             --text-main: #e0e6ed;
             --glass-bg: rgba(20, 23, 38, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.448);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            
+            /* GLOBAL OVERRIDE UNTUK text-muted */
+            --bs-text-muted: #8F9BB3; /* Mengganti warna abu-abu default Bootstrap */
         }
 
         body {
@@ -167,6 +170,7 @@
             background: var(--bg-deep); z-index: 9999;
             display: flex; align-items: center; justify-content: center;
         }
+
         .text-muted {
     /* Gunakan warna yang Anda inginkan (misal, warna neon atau ungu muda) */
     /*color: var(--primary-purple) !important; */
@@ -286,7 +290,7 @@
                 <div class="galaxy-card">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h4 class="m-0">Daftar Barang Milik Negara</h4>
-                        <button class="btn btn-galaxy" data-bs-toggle="modal" data-bs-target="#modalAddAsset">
+                        <button class="btn btn-galaxy" data-bs-toggle="modal" data-bs-target="#modalAddAsset" onclick="setupAddModal()">
                             <i class="fas fa-plus-circle"></i> Tambah Aset
                         </button>
                     </div>
@@ -427,11 +431,13 @@
         <div class="modal-dialog">
             <div class="modal-content galaxy-card">
                 <div class="modal-header border-0">
-                    <h5 class="modal-title">Input Data BMN Baru</h5>
+                    <h5 class="modal-title" id="assetModalTitle">Input Data BMN Baru</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="formAsset">
+                        <input type="hidden" id="assetIdToEdit">
+                        
                         <div class="mb-3">
                             <label class="form-label">Nama Barang</label>
                             <input type="text" class="form-control" id="inputNama" required>
@@ -459,7 +465,7 @@
                                 <option value="Rusak Berat">Rusak Berat</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-galaxy w-100">Simpan & Ajukan Validasi</button>
+                        <button type="submit" class="btn btn-galaxy w-100" id="submitAssetButton">Simpan & Ajukan Validasi</button>
                     </form>
                 </div>
             </div>
@@ -568,6 +574,7 @@
                             <td><span class="badge ${item.cond === 'Baik' ? 'bg-success' : 'bg-warning'}">${item.cond}</span></td>
                             <td><span class="badge bg-primary">Terdaftar</span></td>
                             <td>
+                                <button class="btn btn-sm btn-outline-warning me-1" onclick="openEditModal(${item.id})"><i class="fas fa-edit"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${item.id})"><i class="fas fa-trash"></i></button>
                             </td>
                         </tr>
@@ -604,11 +611,85 @@
             }
         }
 
-        // --- ACTION HANDLERS ---
+        // --- CRUD ACTION HANDLERS (CREATE & UPDATE) ---
 
-        // Add New Asset (Draft/Pending)
+        // Fungsi Helper untuk reset modal ke mode ADD
+        window.setupAddModal = function() {
+            document.getElementById('assetModalTitle').innerText = 'Input Data BMN Baru';
+            document.getElementById('assetIdToEdit').value = '';
+            document.getElementById('submitAssetButton').innerText = 'Simpan & Ajukan Validasi';
+            document.getElementById('formAsset').reset();
+        }
+
+        // Fungsi Utama: Menangani Submit Form (ADD atau EDIT)
         document.getElementById('formAsset').addEventListener('submit', function(e) {
             e.preventDefault();
+            
+            const assetId = document.getElementById('assetIdToEdit').value;
+
+            if (assetId) {
+                // Jika ada ID, lakukan UPDATE
+                updateAsset(parseInt(assetId));
+            } else {
+                // Jika tidak ada ID, lakukan CREATE (ADD)
+                createNewAsset();
+            }
+
+            // Tutup Modal
+            const modalEl = document.getElementById('modalAddAsset');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            e.target.reset();
+        });
+
+        // Fungsi Baru: Membuka Modal dalam Mode Edit
+        window.openEditModal = function(id) {
+            const asset = assets.find(a => a.id === id);
+            if (!asset) return;
+
+            // 1. Set Judul & ID
+            document.getElementById('assetModalTitle').innerText = 'Edit Data Aset (ID: BMN-' + id + ')';
+            document.getElementById('assetIdToEdit').value = id;
+            document.getElementById('submitAssetButton').innerText = 'Simpan Perubahan Aset';
+
+            // 2. Isi Formulir dengan Data Aset
+            document.getElementById('inputNama').value = asset.name;
+            document.getElementById('inputKategori').value = asset.category;
+            document.getElementById('inputNilai').value = asset.value;
+            document.getElementById('inputKondisi').value = asset.cond;
+
+            // 3. Tampilkan Modal
+            const modal = new bootstrap.Modal(document.getElementById('modalAddAsset'));
+            modal.show();
+        }
+
+        // Fungsi Baru: Logika Update Aset
+        function updateAsset(id) {
+            const assetIndex = assets.findIndex(a => a.id === id);
+            if (assetIndex !== -1) {
+                assets[assetIndex].name = document.getElementById('inputNama').value;
+                assets[assetIndex].category = document.getElementById('inputKategori').value;
+                assets[assetIndex].value = parseInt(document.getElementById('inputNilai').value);
+                assets[assetIndex].cond = document.getElementById('inputKondisi').value;
+                
+                // Peringatan: Edit aset yang sudah di-approve akan mengubah statusnya menjadi pending lagi
+                if(assets[assetIndex].status === 'Approved') {
+                    assets[assetIndex].status = 'Pending';
+                    addLog(`Aset ${assets[assetIndex].name} diubah dan memerlukan validasi ulang.`);
+                } else {
+                    addLog(`Data aset ${assets[assetIndex].name} berhasil diubah.`);
+                }
+            }
+            
+            // Refresh Tampilan
+            renderTableBMN();
+            renderValidationTable();
+            updateDashboardStats();
+            alert('Perubahan berhasil disimpan! Silakan cek menu Validasi Aset.');
+        }
+
+        // Fungsi Logika Create Aset
+        function createNewAsset() {
             const newItem = {
                 id: Date.now(),
                 name: document.getElementById('inputNama').value,
@@ -620,21 +701,13 @@
             };
             
             assets.push(newItem);
-            
-            // Log Activity
             addLog(`Input aset baru: ${newItem.name} (Menunggu Validasi)`);
-            
-            // Close Modal
-            const modalEl = document.getElementById('modalAddAsset');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-            e.target.reset();
-
-            // Refresh UI
             updateDashboardStats();
-            if(document.getElementById('view-bmn').classList.contains('active')) renderTableBMN();
+            renderValidationTable();
             alert('Data berhasil disimpan! Menunggu validasi admin.');
-        });
+        }
+
+        // --- DELETE & VALIDATION ---
 
         function validateAsset(id, isApproved) {
             const idx = assets.findIndex(a => a.id === id);
@@ -647,14 +720,18 @@
                     addLog(`Validasi ditolak: ID ${id}`);
                 }
                 renderValidationTable();
+                renderTableBMN();
                 updateDashboardStats();
             }
         }
 
-        function deleteAsset(id) {
+        window.deleteAsset = function(id) {
             if(confirm('Hapus aset ini dari database?')) {
+                const assetName = assets.find(a => a.id === id)?.name || `ID ${id}`;
                 assets = assets.filter(a => a.id !== id);
+                addLog(`Aset ${assetName} dihapus.`);
                 renderTableBMN();
+                renderValidationTable();
                 updateDashboardStats();
             }
         }
